@@ -98,10 +98,13 @@ export const generateImage = async (prompt: string): Promise<string> => {
             },
         });
 
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                return `data:image/png;base64,${base64ImageBytes}`;
+        const parts = response?.candidates?.[0]?.content?.parts;
+        if (parts) {
+            for (const part of parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    return `data:image/png;base64,${base64ImageBytes}`;
+                }
             }
         }
         
