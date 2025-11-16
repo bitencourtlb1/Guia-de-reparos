@@ -1,14 +1,17 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import type { TutorialStep } from '../types';
 
-const API_KEY = process.env.API_KEY;
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+function getAiClient(): GoogleGenAI {
+    const apiKey = sessionStorage.getItem('GEMINI_API_KEY');
+    if (!apiKey) {
+        throw new Error("API Key não encontrada. Por favor, insira sua chave de API para continuar.");
+    }
+    return new GoogleGenAI({ apiKey });
 }
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export const getTutorialList = async (): Promise<string[]> => {
     try {
+        const ai = getAiClient();
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Gere uma lista de 12 tópicos comuns de reparos domésticos em Português do Brasil, adequados para um iniciante em bricolagem. Exemplos: 'Consertar um vaso sanitário com vazamento', 'Remendar um pequeno buraco em drywall'.",
@@ -35,7 +38,10 @@ export const getTutorialList = async (): Promise<string[]> => {
         return [];
     } catch (error) {
         console.error("Erro ao buscar lista de tutoriais:", error);
-        throw new Error("Falha ao buscar a lista de tutoriais da API Gemini.");
+        if (error instanceof Error && error.message.includes("API Key")) {
+            throw error;
+        }
+        throw new Error("Falha ao buscar a lista de tutoriais. Verifique sua chave de API e a conexão.");
     }
 };
 
@@ -49,6 +55,7 @@ export const getTutorialSteps = async (topic: string): Promise<TutorialStep[]> =
         3. Um 'imagePrompt' (prompt de imagem) simples e descritivo para um gerador de imagens de IA criar uma imagem clara, minimalista e em estilo de diagrama instrucional ilustrando o passo. Foque na ação e nas ferramentas. Exemplo: 'Uma mão usando uma chave de fenda para apertar o puxador solto de um armário'.
     `;
     try {
+        const ai = getAiClient();
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
@@ -81,12 +88,16 @@ export const getTutorialSteps = async (topic: string): Promise<TutorialStep[]> =
         return [];
     } catch (error) {
         console.error(`Erro ao buscar os passos do tutorial para "${topic}":`, error);
+         if (error instanceof Error && error.message.includes("API Key")) {
+            throw error;
+        }
         throw new Error(`Falha ao buscar os passos do tutorial para "${topic}".`);
     }
 };
 
 export const generateImage = async (prompt: string): Promise<string> => {
     try {
+        const ai = getAiClient();
         const fullPrompt = `Uma ilustração instrucional minimalista e limpa mostrando: ${prompt}. Fundo branco, linhas simples, paleta de cores limitada. Estilo de diagrama.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -111,6 +122,9 @@ export const generateImage = async (prompt: string): Promise<string> => {
         throw new Error("Nenhuma imagem foi gerada.");
     } catch (error) {
         console.error(`Erro ao gerar imagem para o prompt "${prompt}":`, error);
+         if (error instanceof Error && error.message.includes("API Key")) {
+            throw error;
+        }
         throw new Error("Falha ao gerar a imagem.");
     }
 };

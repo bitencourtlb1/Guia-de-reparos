@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { getTutorialList, getTutorialSteps } from './services/geminiService';
 import type { TutorialStep } from './types';
@@ -6,33 +5,59 @@ import Header from './components/Header';
 import TutorialList from './components/TutorialList';
 import TutorialViewer from './components/TutorialViewer';
 import LoadingSpinner from './components/LoadingSpinner';
+import ApiKeyPrompt from './components/ApiKeyPrompt';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(() => sessionStorage.getItem('GEMINI_API_KEY'));
   const [tutorials, setTutorials] = useState<string[]>([]);
   const [selectedTutorial, setSelectedTutorial] = useState<string | null>(null);
   const [tutorialContent, setTutorialContent] = useState<TutorialStep[] | null>(null);
-  const [loadingList, setLoadingList] = useState<boolean>(true);
+  const [loadingList, setLoadingList] = useState<boolean>(false);
   const [loadingContent, setLoadingContent] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleApiKeySubmit = (newKey: string) => {
+    sessionStorage.setItem('GEMINI_API_KEY', newKey);
+    setApiKey(newKey);
+    setError(null); 
+  };
+  
+  const handleClearApiKey = useCallback(() => {
+    sessionStorage.removeItem('GEMINI_API_KEY');
+    setApiKey(null);
+    setTutorials([]);
+    setSelectedTutorial(null);
+    setTutorialContent(null);
+    setError(null);
+    setLoadingList(false);
+  }, []);
+
   const fetchTutorials = useCallback(async () => {
+    if (!apiKey) return;
+
     try {
       setError(null);
       setLoadingList(true);
       const tutorialList = await getTutorialList();
       setTutorials(tutorialList);
     } catch (err) {
-      setError('Falha ao carregar os tutoriais. Por favor, tente novamente mais tarde.');
+      const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
+      setError(errorMessage);
       console.error(err);
+      if (errorMessage.includes('API Key') || errorMessage.toLowerCase().includes('permission denied')) {
+        handleClearApiKey();
+      }
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [apiKey, handleClearApiKey]);
 
   useEffect(() => {
-    fetchTutorials();
+    if(apiKey) {
+      fetchTutorials();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [apiKey]);
 
   const handleSelectTutorial = useCallback(async (topic: string) => {
     setSelectedTutorial(topic);
@@ -43,7 +68,11 @@ const App: React.FC = () => {
       const steps = await getTutorialSteps(topic);
       setTutorialContent(steps);
     } catch (err) {
-      setError('Falha ao carregar o conteúdo do tutorial. Por favor, volte e tente novamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Ocorreu um erro desconhecido ao carregar o tutorial.');
+      }
       console.error(err);
     } finally {
       setLoadingContent(false);
@@ -55,6 +84,10 @@ const App: React.FC = () => {
     setTutorialContent(null);
     setError(null);
   };
+  
+  if (!apiKey) {
+    return <ApiKeyPrompt onSubmit={handleApiKeySubmit} />;
+  }
 
   const renderContent = () => {
     if (loadingList) {
@@ -97,7 +130,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      <Header />
+      <Header onClearApiKey={handleClearApiKey} />
       <main className="max-w-4xl mx-auto p-4 sm:p-6 md:p-8">
         {renderContent()}
       </main>
